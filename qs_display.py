@@ -230,11 +230,11 @@ class EPaperDisplay:
 
 class ImageCreator:
     def __init__(self):
-        self.sip_icon = self.load_icon(
+        self.puff_icon = self.load_icon(
             IMG_PATHS['airflow_arrow_ltr'],
             flip_horizontal=True
         )
-        self.puff_icon = self.load_icon(IMG_PATHS['airflow_arrow_ltr'])
+        self.sip_icon = self.load_icon(IMG_PATHS['airflow_arrow_ltr'])
 
     @staticmethod
     def load_icon(path, flip_horizontal=False):
