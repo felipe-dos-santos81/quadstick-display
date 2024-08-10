@@ -1,0 +1,129 @@
+# Custom app to Display Quadstick key settings on an e-ink display
+# 2024 felipe.dos.santos
+
+name: "Build Quadstick Display Installer"
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+env:
+  DESC: "Custom app to Display Quadstick key settings on an e-ink display"
+  APP_NAME: "quadstick-display"
+
+jobs:
+  build-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '^3.10.10'
+
+      - name: Installing Poetry
+        run: pipx install poetry
+
+      - name: Set Git Default CI Identity
+        env:
+          CI_USER: ${{ secrets.CI_USER }}
+          CI_EMAIL: ${{ secrets.CI_EMAIL }}
+        run: |
+          git config --global user.name "$CI_USER"
+          git config --global user.email "$CI_EMAIL"
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Creating the package
+        shell: bash
+        env:
+          res_path: "resources"
+        run: |
+          validate_step() {
+            local step_name=$1
+            local expected_count=$2
+            local target_dir=$3
+          
+            echo "Validating $step_name..."
+            local actual_count=$(cd "$target_dir" && ls -1 | wc -l)
+            if [ "$actual_count" -ne "$expected_count" ]; then
+              echo "::error::Error: $step_name failed. Expected $expected_count files, found $actual_count."
+              ls -l "$target_dir"
+              exit 1
+            fi
+          }
+          
+          current_dir=$(pwd)
+          
+          echo
+          echo "Creating package ${{ env.APP_NAME }} folder structure"
+          
+          mkdir -p "${{ env.APP_NAME }}/$res_path"
+          validate_step "app folder creation" 1 "${{ env.APP_NAME }}"
+          
+          echo
+          echo "Generating requirements.txt"
+          poetry export --all-extras --no-interaction --without-hashes \
+                        --output=${{ env.APP_NAME }}/requirements.txt
+          validate_step "app requirements.txt creation" 2 "${{ env.APP_NAME }}"
+          
+          echo
+          echo "Copying the files..."
+          cp qs_display.py ${{ env.APP_NAME }}/qs_display.py
+          cp resources/install/qs_display_httpd.sh ${{ env.APP_NAME }}/qs_display_httpd.sh
+          cp resources/install/qs_display_httpd.service ${{ env.APP_NAME }}/qs_display_httpd.service
+          
+          validate_step "app files copy 1" 5 "${{ env.APP_NAME }}"
+          
+          cp -r resources/templates ${{ env.APP_NAME }}/${{ env.res_path }}/templates
+          validate_step "app files copy 2" 1 "${{ env.APP_NAME }}/${{ env.res_path }}/templates"
+          
+          cp -r resources/fonts ${{ env.APP_NAME }}/${{ env.res_path }}/fonts
+          validate_step "app files copy 3" 4 "${{ env.APP_NAME }}/${{ env.res_path }}/fonts"
+          
+          cp -r resources/images ${{ env.APP_NAME }}/${{ env.res_path }}/images
+          validate_step "app files copy 4" 2 "${{ env.APP_NAME }}/${{ env.res_path }}/images"
+          
+          cp -r resources/quadstick_csvs ${{ env.APP_NAME }}/${{ env.res_path }}/quadstick_csvs
+          validate_step "app files copy 5" 2 "${{ env.APP_NAME }}/${{ env.res_path }}/quadstick_csvs"
+
+      - name: Compressing the package
+        run: |
+          zip -r ${{ env.APP_NAME }}.zip ${{ env.APP_NAME }}
+          zip -r 3d_case.zip 3d_case
+
+      - name: Create the installer
+        run: |
+          cat resources/install/base_install.sh ${{ env.APP_NAME }}.zip > ${{ env.APP_NAME }}.sh
+          chmod +x ${{ env.APP_NAME }}.sh
+          rm -f ${{ env.APP_NAME }}.zip
+
+      - name: Create new version tag
+        id: version
+        run: |
+          git tag -a "v$(date +'%Y.%m.%d.%H.%M.%S')" -m "New Quadstick Display Version" $GITHUB_SHA
+          echo "version=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shell-installer
+          path: |
+            ./${{ env.APP_NAME }}.sh
+            ./3d_case.zip
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          git push origin "${{ steps.version.outputs.version }}" && 
+          gh release create ${{ steps.version.outputs.version }} 
+          --notes-file README.md 
+          "./${{ env.APP_NAME }}.sh" 
+          --title "Quadstick Display ${{ steps.version.outputs.version }}"

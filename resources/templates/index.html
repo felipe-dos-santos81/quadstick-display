@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Quadstick Display - Upload CSV</title>
+    <style>
+        body {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: column;
+            color: #f8f8f2;
+            background-color: #282a36;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            align-items: normal;
+            justify-content: space-between;
+            align-content: space-between;
+        }
+
+        h1, h2, h3, h4 {
+            color: #ff79c6;
+            margin-block-start: 5px;
+            margin-block-end: 0;
+        }
+
+        h2 {
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+
+        span {
+            color: #8be9fd;
+        }
+
+        input[type="file"], button, select {
+            background-color: #44475a;
+            color: #f8f8f2;
+            border: none;
+            padding: 5px;
+            margin: 5px;
+            border-radius: 5px;
+            min-height: 10px;
+            max-height: max-content;
+            cursor: pointer;
+        }
+
+        button:hover, input[type="file"]:hover, select:hover {
+            background-color: #6272a4;
+        }
+
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: column;
+            align-items: normal;
+            margin: 15px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        td {
+            padding: 5px;
+            text-align: left;
+        }
+
+        tr:nth-child(odd) {
+            background-color: #44475a;
+        }
+
+        tr:nth-child(even) {
+            background-color: #6272a4;
+        }
+
+        td label {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<h2>Upload CSV File</h2>
+<form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv">
+    <input type="submit" value="Upload">
+</form>
+
+<h2>Select a CSV File</h2>
+<form action="/render" method="post">
+    <table>
+        <tr>
+    {% for file in csv_files %}
+        {% set selected = "" %}
+        {% if file == selected_file %}
+            {% set selected = "checked" %}
+        {% endif %}
+            <td>
+                <input type="radio" id="{{ file }}" name="selected_file" value="{{ file }}" required {{ selected }}>
+                <label for="{{ file }}">{{ file }}</label>
+            </td>
+        {% if loop.index % 2 == 0 %}
+            </tr>
+            <tr>
+        {% endif %}
+    {% endfor %}
+        </tr>
+    </table>
+    <button type="submit">Submit</button>
+</form>
+</body>
+</html>

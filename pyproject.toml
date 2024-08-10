@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "qs-display"
+version = "0.1.0"
+description = "Display Quadstick data on an Waveshare e-ink display"
+authors = ["Felipe dos Santos <fss007@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pandas = "^2.2.2"
+flask = {extras = ["async"], version = "^3.0.3"}
+flask-uploads = "^0.2.1"
+werkzeug = "^3.0.3"
+pillow = "^10.4.0"
+
+# Raspberry Pi dependencies
+spidev = {version = "^3.6", platform = "linux"}
+gpiozero = {version = "^2.0.1", platform = "linux"}
+rpi-gpio = {version = "^0.7.1", platform = "linux"}
+lgpio = {version = "^0.2.2.0", platform = "linux"}
+
+# Waveshare e-Paper display dependencies
+jetson-gpio = {version = "^2.1.6", platform = "linux"}
+waveshare-epd = { git = "https://github.com/waveshareteam/e-Paper.git", branch = "master", subdirectory = "RaspberryPi_JetsonNano/python" }
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

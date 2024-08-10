@@ -1,0 +1,19 @@
+[Unit]
+Description=Init script for Quadstick Display HTTPD
+Requires=network-online.target
+After=multi-user.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__WORKING_DIRECTORY__
+ExecStart=__WORKING_DIRECTORY__/qs_display_httpd.sh
+ExecReload=/bin/kill -HUP ${MAINPID}
+RestartSec=20
+Restart=on-failure
+
+# StandardOutput=append:/var/log/qs_display_httpd.log
+StandardError=append:/var/log/qs_display_httpd.log
+
+[Install]
+WantedBy=multi-user.target
