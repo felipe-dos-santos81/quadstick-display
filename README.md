@@ -14,9 +14,11 @@ Useful as a quick reference for the current key bindings when playing games.
 
 ## Handling Quadstick CSV files
 
-| Uploads must be done through the web interface | Display a given key-set can be done through the web |
-|:----------------------------------------------:|:---------------------------------------------------:|
-|   ![Init screen](readme_images/qs_init.jpg)    | ![Key settings screen](readme_images/qs_keys.jpeg)  |
+|           Initialization Screen           | Upload and keys selection must be done through the web interface      | Display a given key-set can be done through the web |
+|:-----------------------------------------:|-----------------------------------------------------------------------|:---------------------------------------------------:|
+| ![Init screen](readme_images/qs_init.jpg) | ![display_web_interface.jpg](readme_images/display_web_interface.jpg) | ![Key settings screen](readme_images/qs_keys.jpeg)  |
+
+> **Note**: The CSV file stored on the Quadstick is the ones that must be used to upload.
 
 ## The arrow represents the air flow direction
 
