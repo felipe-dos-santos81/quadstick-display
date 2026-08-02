@@ -9,53 +9,53 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   APP_NAME: "quadstick-display"
 
 jobs:
-  test-package-and-release:
+  verify:
+    uses: ./.github/workflows/_verify.yml
+
+  release:
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Check the tag matches the project version
+        run: |
+          project_version="$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$project_version" != "$tag_version" ]; then
+            echo "Error: tag $GITHUB_REF_NAME does not match pyproject.toml version $project_version" >&2
+            exit 1
+          fi
 
-      - name: Installing Poetry
-        run: pipx install poetry
-
-      - name: Installing the Poetry export plugin
-        run: pipx inject poetry poetry-plugin-export
-
-      - name: Install dependencies
-        run: poetry install --with dev --no-interaction
-
-      - name: Run tests
-        run: poetry run pytest -q
-
-      - name: Build the installer package
-        run: scripts/build_installer.sh
-
-      - name: Verify the installer archive integrity
-        run: unzip -t dist/${{ env.APP_NAME }}.zip
-
-      - uses: actions/upload-artifact@v4
+      - name: Download the installer artifacts
+        uses: actions/download-artifact@v4
         with:
           name: shell-installer
-          path: |
-            ./dist/${{ env.APP_NAME }}.sh
-            ./dist/3d_case.zip
+          path: dist
+
+      - name: Mark prerelease tags
+        if: contains(github.ref_name, '-')
+        run: echo "PRERELEASE_FLAG=--prerelease" >> "$GITHUB_ENV"
 
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
           gh release create "${{ github.ref_name }}"
-          --notes-file README.md
+          --generate-notes
           --title "Quadstick Display ${{ github.ref_name }}"
+          ${PRERELEASE_FLAG}
           "./dist/${{ env.APP_NAME }}.sh"
