@@ -1,29 +1,35 @@
 """Characterize CSV profile loading and text formatting.
 
-Pins the current behavior of ``CSVLoader`` and ``TextFormatter`` against the
-two bundled sample profiles. The semantic compatibility targets are 16
-bindings for ``ad_infinitum.csv`` and 24 for ``alan_wake_II.csv``, with row
-order and duplicate bindings preserved.
+M4 cutover: these pins previously targeted the legacy ``qs_display``
+``CSVLoader``/``TextFormatter`` (pandas); they now target the package
+interfaces — ``ProfileStore`` for loading and
+``ProfileRenderer._format_bindings`` for presentation cleanup. The
+semantic targets are unchanged: 16 bindings for ``ad_infinitum.csv`` and
+24 for ``alan_wake_II.csv``, with titles, row order, and duplicate
+bindings preserved. The legacy pandas-specific pins (loader row tail,
+DataFrame column names) were dropped when M1 replaced the parser.
 """
-import pandas as pd
 import pytest
-from PIL import ImageFont
 
-from qs_display import (
-    CSVLoader,
-    FONT_PATHS,
+from quadstick_display.model import Binding, Profile, ProfileStore
+from quadstick_display.view import (
     INPUT_CLEANUP,
     OUTPUT_CLEANUP,
-    TEXT_SIZE,
-    TextFormatter,
+    ProfileRenderer,
+    _text_clean,
 )
+from pathlib import Path
+
+RESOURCES = Path(__file__).resolve().parents[2] / 'resources'
+CSVS_DIR = RESOURCES / 'quadstick_csvs'
 
 AD_INFINITUM = 'ad_infinitum.csv'
 ALAN_WAKE_II = 'alan_wake_II.csv'
 
 # Ordered (command, quadstick input) pairs produced by
-# TextFormatter.format_text for each bundled profile. mp_* values pass
-# through unchanged (lowercase); everything else is cleaned and uppercased.
+# ProfileRenderer._format_bindings for each bundled profile. mp_* values
+# pass through unchanged (lowercase); everything else is cleaned and
+# uppercased.
 AD_INFINITUM_BINDINGS = [
     ('W', 'UP'),
     ('S', 'DOWN'),
@@ -72,54 +78,52 @@ ALAN_WAKE_II_BINDINGS = [
 
 
 @pytest.fixture(scope='module')
-def font_text():
-    return ImageFont.truetype(FONT_PATHS['verdana_bold'], TEXT_SIZE)
+def renderer():
+    return ProfileRenderer(RESOURCES)
 
 
 def load(filename):
-    return CSVLoader(filename).load_csv()
+    return ProfileStore(CSVS_DIR).load(filename)
 
 
-def formatted(filename, font_text, width=400):
-    data, _ = load(filename)
-    return TextFormatter.format_text(data, font_text, width)
+def formatted(renderer, filename, width=400):
+    profile = load(filename)
+    return renderer._format_bindings(profile.bindings, width)
 
 
 class TestProfileNames:
     def test_ad_infinitum_name_comes_from_last_header(self):
-        _, name = load(AD_INFINITUM)
-        assert name == 'Ad_Infinitum'
+        assert load(AD_INFINITUM).name == 'Ad_Infinitum'
 
     def test_alan_wake_ii_name_comes_from_last_header(self):
-        _, name = load(ALAN_WAKE_II)
-        assert name == 'Alan Wake II'
+        assert load(ALAN_WAKE_II).name == 'Alan Wake II'
 
 
 class TestBindingCounts:
-    def test_ad_infinitum_has_16_bindings(self, font_text):
-        _, bindings = formatted(AD_INFINITUM, font_text)
+    def test_ad_infinitum_has_16_bindings(self, renderer):
+        _, bindings = formatted(renderer, AD_INFINITUM)
         assert len(bindings) == 16
 
-    def test_alan_wake_ii_has_24_bindings(self, font_text):
-        _, bindings = formatted(ALAN_WAKE_II, font_text)
+    def test_alan_wake_ii_has_24_bindings(self, renderer):
+        _, bindings = formatted(renderer, ALAN_WAKE_II)
         assert len(bindings) == 24
 
 
 class TestOrderedRows:
-    def test_ad_infinitum_rows_in_order(self, font_text):
-        _, bindings = formatted(AD_INFINITUM, font_text)
+    def test_ad_infinitum_rows_in_order(self, renderer):
+        _, bindings = formatted(renderer, AD_INFINITUM)
         assert bindings == AD_INFINITUM_BINDINGS
 
-    def test_alan_wake_ii_rows_in_order(self, font_text):
-        _, bindings = formatted(ALAN_WAKE_II, font_text)
+    def test_alan_wake_ii_rows_in_order(self, renderer):
+        _, bindings = formatted(renderer, ALAN_WAKE_II)
         assert bindings == ALAN_WAKE_II_BINDINGS
 
 
 class TestDuplicateBindings:
-    def test_duplicate_quadstick_inputs_are_preserved(self, font_text):
-        # kb_left_alt and kb_z both bind to mp_right_sip; both rows survive,
-        # in file order, at the end of the mapping section.
-        _, bindings = formatted(ALAN_WAKE_II, font_text)
+    def test_duplicate_quadstick_inputs_are_preserved(self, renderer):
+        # kb_left_alt and kb_z both bind to mp_right_sip; both rows
+        # survive, in file order, at the end of the mapping section.
+        _, bindings = formatted(renderer, ALAN_WAKE_II)
         assert bindings[-2:] == [
             ('LEFT.ALT', 'mp_right_sip'),
             ('Z', 'mp_right_sip'),
@@ -130,37 +134,17 @@ class TestDuplicateBindings:
         ]
 
 
-class TestLoaderOutput:
-    @pytest.mark.parametrize(
-        'filename,row_count',
-        [(AD_INFINITUM, 20), (ALAN_WAKE_II, 28)],
-    )
-    def test_loader_keeps_rows_past_preferences(self, filename, row_count):
-        # The raw loader output includes the Preferences section tail; the
-        # formatter is responsible for stopping at 'Preferences'.
-        data, _ = load(filename)
-        assert len(data) == row_count
-        tail = list(data.itertuples(index=False, name=None))[-4:]
-        assert tail[0][0] == 'Preferences'
-        assert pd.isna(tail[0][1])
-        assert tail[1] == ('Preference', 'Units')
-        assert tail[2] == ('digital_out_1', 'on/off')
-        assert tail[3] == ('digital_out_2', 'on/off')
-
-    def test_loader_column_names(self):
-        data, _ = load(AD_INFINITUM)
-        assert list(data.columns) == ['Command', 'Quadstick']
-
-
 class TestColumnSplitWidth:
     @pytest.mark.parametrize(
         'filename,expected',
         [(AD_INFINITUM, 160.078125), (ALAN_WAKE_II, 161.8125)],
     )
-    def test_max_width_drives_the_mouthpiece_column(self, font_text, filename, expected):
+    def test_max_width_drives_the_mouthpiece_column(
+        self, renderer, filename, expected
+    ):
         # Font metrics come from the bundled Verdana Bold; allow a small
         # tolerance for FreeType variation across hosts.
-        max_width, _ = formatted(filename, font_text, width=400)
+        max_width, _ = formatted(renderer, filename, width=400)
         assert max_width == pytest.approx(expected, rel=0.01)
         assert max_width <= 400 // 2
 
@@ -185,31 +169,31 @@ class TestTextClean:
         ],
     )
     def test_cleanup_rules(self, raw, cleanup, expected):
-        assert TextFormatter._text_clean(raw, cleanup) == expected
+        assert _text_clean(raw, cleanup) == expected
 
 
-class TestFormatTextEdges:
-    def test_format_stops_at_preferences(self, font_text):
-        data = pd.DataFrame(
-            [
-                ('kb_a', 'up'),
-                ('Preferences', 'x'),
-                ('kb_b', 'down'),
-            ],
-            columns=['Command', 'Quadstick'],
+class TestFormatBindingsEdges:
+    def test_format_stops_at_preferences(self, renderer):
+        profile = Profile(
+            name='test',
+            bindings=(
+                Binding('kb_a', 'up'),
+                Binding('Preferences', 'x'),
+                Binding('kb_b', 'down'),
+            ),
         )
-        _, bindings = TextFormatter.format_text(data, font_text, 400)
+        _, bindings = renderer._format_bindings(profile.bindings, 400)
         assert bindings == [('A', 'UP')]
 
-    def test_format_skips_rows_with_empty_cells(self, font_text):
-        data = pd.DataFrame(
-            [
-                ('kb_a', 'up'),
-                ('', 'down'),
-                ('kb_b', ''),
-                ('kb_c', 'left'),
-            ],
-            columns=['Command', 'Quadstick'],
+    def test_format_skips_rows_with_empty_cells(self, renderer):
+        profile = Profile(
+            name='test',
+            bindings=(
+                Binding('kb_a', 'up'),
+                Binding('', 'down'),
+                Binding('kb_b', ''),
+                Binding('kb_c', 'left'),
+            ),
         )
-        _, bindings = TextFormatter.format_text(data, font_text, 400)
+        _, bindings = renderer._format_bindings(profile.bindings, 400)
         assert bindings == [('A', 'UP'), ('C', 'LEFT')]

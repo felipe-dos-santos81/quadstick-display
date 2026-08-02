@@ -78,17 +78,37 @@
         td label {
             cursor: pointer;
         }
+
+        .error {
+            color: #ff5555;
+        }
     </style>
 </head>
 <body>
+<h2>Display Status</h2>
+<p>Current profile:
+    {% if status.current_profile %}
+    <span>{{ status.current_profile }}</span>
+    {% else %}
+    <span>none</span>
+    {% endif %}
+</p>
+{% if status.last_error %}
+<p class="error">Last display error: {{ status.last_error }}</p>
+{% endif %}
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% endif %}
+
 <h2>Upload CSV File</h2>
-<form action="/upload" method="post" enctype="multipart/form-data">
+<form action="{{ url_for('web.upload') }}" method="post" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv">
     <input type="submit" value="Upload">
 </form>
 
 <h2>Select a CSV File</h2>
-<form action="/render" method="post">
+{% if csv_files %}
+<form action="{{ url_for('web.render') }}" method="post">
     <table>
         <tr>
     {% for file in csv_files %}
@@ -109,5 +129,8 @@
     </table>
     <button type="submit">Submit</button>
 </form>
+{% else %}
+<p>No profiles uploaded yet. Upload a Quadstick CSV export to get started.</p>
+{% endif %}
 </body>
 </html>

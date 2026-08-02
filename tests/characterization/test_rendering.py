@@ -1,91 +1,101 @@
 """Characterize Pillow rendering of the settings table.
 
-Pins the current behavior of ``ImageCreator`` and ``DrawMpButtons``: image
-mode and dimensions, black/red plane responsibilities, mouthpiece button
-glyphs, sip/puff arrow orientation, the text-only fallback, and overflow
-resizing. Geometry is derived from the production constants and font metrics
-rather than hard-coded pixel coordinates where practical.
+M4 cutover: these pins previously targeted the legacy ``qs_display``
+``ImageCreator``/``DrawMpButtons``; they now target the package view,
+``ProfileRenderer``. The pinned invariants are unchanged: image mode and
+dimensions, black/red plane responsibilities, mouthpiece button glyphs,
+sip/puff arrow orientation, the text-only fallback, and overflow
+resizing. Geometry is derived from the production constants and font
+metrics rather than hard-coded pixel coordinates where practical.
 
-Display geometry mirrors the production wiring for the 4.2-inch panel:
-width 400 (``epd.height``) x height 300 (``epd.width``).
+The legacy ``DrawMpButtons.is_text_only`` attribute pin was dropped with
+the legacy class; the observable text-only rendering fallback remains
+pinned. Display geometry mirrors the production wiring for the 4.2-inch
+panel: width 400 (``epd.height``) x height 300 (``epd.width``).
 """
 import logging
 from math import ceil
+from pathlib import Path
 
-import pandas as pd
 import pytest
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops
 
-from qs_display import (
-    CSVLoader,
-    FONT_PATHS,
+from quadstick_display.controller import DisplaySize
+from quadstick_display.model import Binding, Profile, ProfileStore
+from quadstick_display.view import (
     IMAGE_MODE,
-    IMG_PATHS,
     MP_BUTTONS,
     TEXT_SIZE,
     TEXT_SIZE_OFFSET,
-    DrawMpButtons,
-    ImageCreator,
-    TextFormatter,
+    ProfileRenderer,
 )
+
+RESOURCES = Path(__file__).resolve().parents[2] / 'resources'
+CSVS_DIR = RESOURCES / 'quadstick_csvs'
 
 DISPLAY_WIDTH = 400
 DISPLAY_HEIGHT = 300
+DISPLAY_SIZE = DisplaySize(width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT)
 
 RADIUS = int(ceil(TEXT_SIZE / TEXT_SIZE_OFFSET))  # 7
 BUTTON_STRIDE = (RADIUS * 2) + 4  # 18
 
 # Verbatim copy of the production mouthpiece mapping table: three button
-# bits (left, center, right), then the sip/puff bit, then the soft bit.
+# bits (left, center, right), then the is_puff bit, then the soft bit.
 EXPECTED_MP_BUTTONS = {
-    'mp_left_sip': [1, 0, 0, 0, 0],
-    'mp_left_puff': [1, 0, 0, 1, 0],
-    'mp_left_sip_soft': [1, 0, 0, 0, 1],
-    'mp_left_puff_soft': [1, 0, 0, 1, 1],
-    'mp_center_sip': [0, 1, 0, 0, 0],
-    'mp_center_puff': [0, 1, 0, 1, 0],
-    'mp_center_sip_soft': [0, 1, 0, 0, 1],
-    'mp_center_puff_soft': [0, 1, 0, 1, 1],
-    'mp_right_sip': [0, 0, 1, 0, 0],
-    'mp_right_puff': [0, 0, 1, 1, 0],
-    'mp_right_sip_soft': [0, 0, 1, 0, 1],
-    'mp_right_puff_soft': [0, 0, 1, 1, 1],
-    'mp_left_center_sip': [1, 1, 0, 0, 0],
-    'mp_left_center_puff': [1, 1, 0, 1, 0],
-    'mp_left_center_sip_soft': [1, 1, 0, 0, 1],
-    'mp_left_center_puff_soft': [1, 1, 0, 1, 1],
-    'mp_right_center_sip': [0, 1, 1, 0, 0],
-    'mp_right_center_puff': [0, 1, 1, 1, 0],
-    'mp_right_center_sip_soft': [0, 1, 1, 0, 1],
-    'mp_right_center_puff_soft': [0, 1, 1, 1, 1],
-    'mp_triple_sip': [1, 1, 1, 0, 0],
-    'mp_triple_puff': [1, 1, 1, 1, 0],
-    'mp_triple_sip_soft': [1, 1, 1, 0, 1],
-    'mp_triple_puff_soft': [1, 1, 1, 1, 1],
+    'mp_left_sip': (1, 0, 0, 0, 0),
+    'mp_left_puff': (1, 0, 0, 1, 0),
+    'mp_left_sip_soft': (1, 0, 0, 0, 1),
+    'mp_left_puff_soft': (1, 0, 0, 1, 1),
+    'mp_center_sip': (0, 1, 0, 0, 0),
+    'mp_center_puff': (0, 1, 0, 1, 0),
+    'mp_center_sip_soft': (0, 1, 0, 0, 1),
+    'mp_center_puff_soft': (0, 1, 0, 1, 1),
+    'mp_right_sip': (0, 0, 1, 0, 0),
+    'mp_right_puff': (0, 0, 1, 1, 0),
+    'mp_right_sip_soft': (0, 0, 1, 0, 1),
+    'mp_right_puff_soft': (0, 0, 1, 1, 1),
+    'mp_left_center_sip': (1, 1, 0, 0, 0),
+    'mp_left_center_puff': (1, 1, 0, 1, 0),
+    'mp_left_center_sip_soft': (1, 1, 0, 0, 1),
+    'mp_left_center_puff_soft': (1, 1, 0, 1, 1),
+    'mp_right_center_sip': (0, 1, 1, 0, 0),
+    'mp_right_center_puff': (0, 1, 1, 1, 0),
+    'mp_right_center_sip_soft': (0, 1, 1, 0, 1),
+    'mp_right_center_puff_soft': (0, 1, 1, 1, 1),
+    'mp_triple_sip': (1, 1, 1, 0, 0),
+    'mp_triple_puff': (1, 1, 1, 1, 0),
+    'mp_triple_sip_soft': (1, 1, 1, 0, 1),
+    'mp_triple_puff_soft': (1, 1, 1, 1, 1),
 }
 
 ONE_ROW = [('kb_space', 'mp_center_sip')]
 
 
 @pytest.fixture(scope='module')
-def font_text():
-    return ImageFont.truetype(FONT_PATHS['verdana_bold'], TEXT_SIZE)
+def renderer():
+    return ProfileRenderer(RESOURCES)
 
 
-def render(font_text, rows, width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT):
-    data = pd.DataFrame(rows, columns=['Command', 'Quadstick'])
-    return ImageCreator().create_image(data, font_text, width, height)
+def make_profile(rows):
+    return Profile(
+        name='test',
+        bindings=tuple(Binding(command, quadstick_input) for command, quadstick_input in rows),
+    )
 
 
-def column_split(font_text, rows, width=DISPLAY_WIDTH):
-    data = pd.DataFrame(rows, columns=['Command', 'Quadstick'])
-    x2, _ = TextFormatter.format_text(data, font_text, width)
-    return x2
+def render(renderer, rows, width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT):
+    return renderer.render(make_profile(rows), DisplaySize(width=width, height=height))
 
 
-def mouthpiece_origin(font_text, rows, row_index=0):
+def column_split(renderer, rows, width=DISPLAY_WIDTH):
+    max_width, _ = renderer._format_bindings(make_profile(rows).bindings, width)
+    return max_width
+
+
+def mouthpiece_origin(renderer, rows, row_index=0):
     """Top-left reference for the mouthpiece cluster of a rendered row."""
-    x2 = column_split(font_text, rows)
+    x2 = column_split(renderer, rows)
     x0 = int(x2 + TEXT_SIZE)
     y_center = int(float(row_index) * TEXT_SIZE + TEXT_SIZE - (TEXT_SIZE // TEXT_SIZE_OFFSET))
     return x0, y_center
@@ -118,42 +128,42 @@ class TestMouthpieceTable:
 
 
 class TestImageBasics:
-    def test_planes_mode_and_dimensions(self, font_text):
-        image_blk, image_red = render(font_text, [('kb_w', 'up'), ('kb_s', 'down')])
-        assert image_blk is not image_red
-        for plane in (image_blk, image_red):
+    def test_planes_mode_and_dimensions(self, renderer):
+        frame = render(renderer, [('kb_w', 'up'), ('kb_s', 'down')])
+        assert frame.black is not frame.red
+        for plane in (frame.black, frame.red):
             assert plane.mode == IMAGE_MODE == '1'
             assert plane.size == (DISPLAY_WIDTH, DISPLAY_HEIGHT)
             # Nothing reaches the bottom-right corner at this content size.
             assert plane.getpixel((DISPLAY_WIDTH - 1, DISPLAY_HEIGHT - 1)) == 255
-        assert 0 in image_blk.getdata()  # content was drawn
+        assert 0 in frame.black.getdata()  # content was drawn
 
-    def test_separator_is_split_across_planes(self, font_text):
+    def test_separator_is_split_across_planes(self, renderer):
         rows = [('kb_w', 'up'), ('kb_s', 'down')]
-        image_blk, image_red = render(font_text, rows)
+        frame = render(renderer, rows)
         for row_index in range(2):
             y_line = row_index * TEXT_SIZE + 2
             # Left of the split the separator lives in the red plane...
-            assert image_red.getpixel((1, y_line)) == 0
+            assert frame.red.getpixel((1, y_line)) == 0
             # ...and only there; right of the split it lives in black only.
-            assert image_red.getpixel((DISPLAY_WIDTH - 1, y_line)) == 255
-            assert image_blk.getpixel((DISPLAY_WIDTH - 1, y_line)) == 0
+            assert frame.red.getpixel((DISPLAY_WIDTH - 1, y_line)) == 255
+            assert frame.black.getpixel((DISPLAY_WIDTH - 1, y_line)) == 0
 
-    def test_command_text_only_in_black_plane(self, font_text):
-        image_blk, image_red = render(font_text, ONE_ROW)
-        x2 = column_split(font_text, ONE_ROW)
+    def test_command_text_only_in_black_plane(self, renderer):
+        frame = render(renderer, ONE_ROW)
+        x2 = column_split(renderer, ONE_ROW)
         text_zone = (0, 3, int(x2) - 1, TEXT_SIZE - 1)
-        assert has_dark(image_blk, text_zone)
-        assert all_white(image_red, text_zone)
+        assert has_dark(frame.black, text_zone)
+        assert all_white(frame.red, text_zone)
 
 
 class TestMouthpieceRendering:
     @pytest.mark.parametrize('button', sorted(EXPECTED_MP_BUTTONS))
-    def test_button_glyphs_match_mapping_table(self, font_text, button):
+    def test_button_glyphs_match_mapping_table(self, renderer, button):
         rows = [('kb_space', button)]
-        image_blk, image_red = render(font_text, rows)
+        frame = render(renderer, rows)
         config = EXPECTED_MP_BUTTONS[button]
-        x0, y_center = mouthpiece_origin(font_text, rows)
+        x0, y_center = mouthpiece_origin(renderer, rows)
 
         # Three circles, filled per the first three config bits. Filled
         # circles are solid (center pixel dark); unfilled are rings (center
@@ -161,106 +171,74 @@ class TestMouthpieceRendering:
         for position in range(3):
             center = (x0 + position * BUTTON_STRIDE, y_center)
             expected = 0 if config[position] else 255
-            assert image_red.getpixel(center) == expected
-            assert image_blk.getpixel(center) == 255
+            assert frame.red.getpixel(center) == expected
+            assert frame.black.getpixel(center) == 255
 
-        # The sip/puff icon is pasted into the black plane right after the
-        # third circle for every mouthpiece mapping.
+        # The sip/puff arrow is pasted into the black plane right after
+        # the third circle for every mouthpiece mapping.
         icon_left = x0 + (3 * BUTTON_STRIDE) - RADIUS
         icon_zone = (icon_left, 3, icon_left + 28, 24)
-        assert has_dark(image_blk, icon_zone)
+        assert has_dark(frame.black, icon_zone)
 
-        # 'soft' text is drawn in the black plane after the icon if and only
-        # if the soft bit is set.
+        # 'soft' text is drawn in the black plane after the icon if and
+        # only if the soft bit is set.
         soft_zone = (icon_left + 29, 3, icon_left + 93, 24)
         if config[4]:
-            assert has_dark(image_blk, soft_zone)
+            assert has_dark(frame.black, soft_zone)
         else:
-            assert all_white(image_blk, soft_zone)
+            assert all_white(frame.black, soft_zone)
 
-    def test_text_only_fallback_for_non_mouthpiece_outputs(self, font_text):
+    def test_text_only_fallback_for_non_mouthpiece_outputs(self, renderer):
         # Outputs that are not mp_* buttons (e.g. 'right_puff' -> 'R.PUFF')
         # render as red-plane text: no circles, no black-plane icon.
         rows = [('kb_space', 'right_puff')]
-        image_blk, image_red = render(font_text, rows)
-        x0, _ = mouthpiece_origin(font_text, rows)
+        frame = render(renderer, rows)
+        x0, _ = mouthpiece_origin(renderer, rows)
 
         text_zone = (x0 - RADIUS, 3, x0 + 93, 24)
-        assert has_dark(image_red, text_zone)
-        assert all_white(image_blk, text_zone)
-
-    def test_draw_mp_flags_text_only_for_unknown_buttons(self, font_text):
-        creator = ImageCreator()
-        image = Image.new('1', (200, 50), 255)
-        buttons = DrawMpButtons(
-            image_blk=image,
-            draw_blk=ImageDraw.Draw(image),
-            image_red=image,
-            draw_red=ImageDraw.Draw(image),
-            sip_icon=creator.sip_icon,
-            puff_icon=creator.puff_icon,
-            font_text=font_text,
-            x=20,
-            y=20,
-        )
-        assert buttons.is_text_only is False
-        buttons.draw_mp('R.PUFF')
-        assert buttons.is_text_only is True
-
-        buttons = DrawMpButtons(
-            image_blk=image,
-            draw_blk=ImageDraw.Draw(image),
-            image_red=image,
-            draw_red=ImageDraw.Draw(image),
-            sip_icon=creator.sip_icon,
-            puff_icon=creator.puff_icon,
-            font_text=font_text,
-            x=20,
-            y=20,
-        )
-        buttons.draw_mp('mp_center_sip')
-        assert buttons.is_text_only is False
+        assert has_dark(frame.red, text_zone)
+        assert all_white(frame.black, text_zone)
 
 
 class TestArrowOrientation:
-    def test_icons_are_resized_to_text_height(self):
-        creator = ImageCreator()
-        raw = Image.open(IMG_PATHS['airflow_arrow_ltr'])
+    def test_icons_are_resized_to_text_height(self, renderer):
+        raw = Image.open(RESOURCES / 'images' / 'airflow_arrow_ltr.png')
         expected_width = int((raw.width / raw.height) * TEXT_SIZE)
-        assert creator.sip_icon.size == (expected_width, TEXT_SIZE) == (28, 18)
-        assert creator.puff_icon.size == creator.sip_icon.size
+        assert renderer.arrow_right_icon.size == (expected_width, TEXT_SIZE) == (28, 18)
+        assert renderer.arrow_left_icon.size == renderer.arrow_right_icon.size
 
-    def test_puff_icon_is_horizontal_flip_of_sip_icon(self):
-        creator = ImageCreator()
-        flipped = creator.sip_icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    def test_left_arrow_is_horizontal_flip_of_right_arrow(self, renderer):
+        flipped = renderer.arrow_right_icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
         diff = ImageChops.difference(
-            creator.puff_icon.convert('L'), flipped.convert('L')
+            renderer.arrow_left_icon.convert('L'), flipped.convert('L')
         )
         assert diff.getbbox() is None
 
     def test_source_art_points_right(self):
         # The bundled arrow points left-to-right: the narrow, vertically
         # centered tip is on the right edge; the wide tail mass is on the
-        # left. So sip_icon (unflipped) points right and puff_icon (flipped)
+        # left. So the unflipped icon points right and the flipped one
         # points left.
-        raw = Image.open(IMG_PATHS['airflow_arrow_ltr'])
+        raw = Image.open(RESOURCES / 'images' / 'airflow_arrow_ltr.png')
         left = dark_rows_in_band(raw, 0, 10)
         right = dark_rows_in_band(raw, raw.width - 10, raw.width)
         assert len(right) < len(left)
         assert min(right) < raw.height // 2 < max(right)
 
-    def test_sip_points_left_and_puff_points_right(self, font_text):
-        image_sip, _ = render(font_text, [('kb_space', 'mp_center_sip')])
-        image_puff, _ = render(font_text, [('kb_space', 'mp_center_puff')])
+    def test_sip_points_left_and_puff_points_right(self, renderer):
+        frame_sip = render(renderer, [('kb_space', 'mp_center_sip')])
+        frame_puff = render(renderer, [('kb_space', 'mp_center_puff')])
 
         # Same command text and same circles: the black planes differ only
         # where the arrow icon was pasted.
-        diff = ImageChops.difference(image_sip.convert('L'), image_puff.convert('L'))
+        diff = ImageChops.difference(
+            frame_sip.black.convert('L'), frame_puff.black.convert('L')
+        )
         bbox = diff.getbbox()
         assert bbox is not None
 
-        region_sip = image_sip.crop(bbox)
-        region_puff = image_puff.crop(bbox)
+        region_sip = frame_sip.black.crop(bbox)
+        region_puff = frame_puff.black.crop(bbox)
 
         # The two pasted icons are exact horizontal mirrors.
         mirror = ImageChops.difference(
@@ -282,35 +260,33 @@ class TestArrowOrientation:
 
 
 class TestOverflowResizing:
-    def test_oversized_content_is_downscaled_to_display_size(self, font_text, caplog):
+    def test_oversized_content_is_downscaled_to_display_size(self, renderer, caplog):
         # 24 rows * 18px = 432px > 300px display height: the image is drawn
         # tall and then resized back with BOX resampling.
-        data, _ = CSVLoader('alan_wake_II.csv').load_csv()
+        profile = ProfileStore(CSVS_DIR).load('alan_wake_II.csv')
         with caplog.at_level(logging.INFO):
-            image_blk, image_red = ImageCreator().create_image(
-                data, font_text, DISPLAY_WIDTH, DISPLAY_HEIGHT
-            )
-        for plane in (image_blk, image_red):
+            frame = renderer.render(profile, DISPLAY_SIZE)
+        for plane in (frame.black, frame.red):
             assert plane.size == (DISPLAY_WIDTH, DISPLAY_HEIGHT)
             assert plane.mode == '1'
         assert 'Resizing image to 400x432' in caplog.text
         assert 'Resizing image back to the display size 400x300' in caplog.text
 
-    def test_content_that_fits_is_not_resized(self, font_text, caplog):
+    def test_content_that_fits_is_not_resized(self, renderer, caplog):
         # 16 rows * 18px = 288px <= 300px: the image is drawn at display
         # size and no resize happens.
-        data, _ = CSVLoader('ad_infinitum.csv').load_csv()
+        profile = ProfileStore(CSVS_DIR).load('ad_infinitum.csv')
         with caplog.at_level(logging.INFO):
-            image_blk, image_red = ImageCreator().create_image(
-                data, font_text, DISPLAY_WIDTH, DISPLAY_HEIGHT
-            )
-        for plane in (image_blk, image_red):
+            frame = renderer.render(profile, DISPLAY_SIZE)
+        for plane in (frame.black, frame.red):
             assert plane.size == (DISPLAY_WIDTH, DISPLAY_HEIGHT)
         assert 'Resizing image' not in caplog.text
 
-    def test_taller_display_yields_taller_image(self, font_text, caplog):
-        data, _ = CSVLoader('alan_wake_II.csv').load_csv()
+    def test_taller_display_yields_taller_image(self, renderer, caplog):
+        profile = ProfileStore(CSVS_DIR).load('alan_wake_II.csv')
         with caplog.at_level(logging.INFO):
-            image_blk, _ = ImageCreator().create_image(data, font_text, 400, 500)
-        assert image_blk.size == (400, 500)
+            frame = renderer.render(
+                profile, DisplaySize(width=400, height=500)
+            )
+        assert frame.black.size == (400, 500)
         assert 'Resizing image' not in caplog.text
