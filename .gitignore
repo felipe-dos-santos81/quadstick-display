@@ -8,9 +8,6 @@ __pycache__/
 
 .idea/**
 
-poetry.lock
-
-quadstick_display/**
 quadstick_display.zip
 .venv/**
 venv/**
@@ -134,3 +131,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .DS_Store
+.superpowers/

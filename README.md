@@ -115,9 +115,9 @@ Use it to flash the **Raspberry Pi OS Lite** image to a microSD card.
 
 ### Installing
 
-Download the `installer` package from the releases
+Releases are published from `v*` tags. Download the `quadstick-display.sh` installer package from the [releases](../../releases) page.
 
-Copy the `installer` package file to the Raspberry Pi
+Copy the installer package file to the Raspberry Pi
 
 <details>
 
@@ -172,3 +172,28 @@ Install the `installer` package on the Raspberry Pi
 ```bash
 chmod +x quadstick-display.sh && ./quadstick-display.sh
 ```
+
+The installer extracts the application to `/usr/local/quadstick-display`, creates a Python virtual environment, and enables the `qs_display_httpd.service` systemd unit, which serves the web interface on port 8080. Re-running the installer upgrades the application in place; custom uploaded CSV profiles are preserved.
+
+## Development
+
+Requires Python 3.10+ and [Poetry](https://python-poetry.org/).
+
+The application lives in the `quadstick_display` package following a Model-View-Controller split (`model.py`, `view.py`, `controller.py`, `hardware.py`, `web.py`); `qs_display.py` remains the production entrypoint invoked by the systemd unit, and resources (templates, fonts, images, CSV profiles) ship in `resources/` next to the package.
+
+```bash
+# install dependencies (the export plugin is needed to build the installer)
+poetry self add poetry-plugin-export  # pipx installs: pipx inject poetry poetry-plugin-export
+poetry install --with dev --no-interaction
+
+# run the test suite (no Raspberry Pi hardware required)
+poetry run pytest -q
+
+# build the installer package into dist/
+scripts/build_installer.sh
+
+# verify the packaged archive
+unzip -t dist/quadstick-display.zip
+```
+
+Continuous integration runs the tests and the packaging on every pull request and branch push with read-only permissions (`.github/workflows/verify.yml`). Pushing a `v*` tag runs the same checks and publishes the GitHub release with the installer attached (`.github/workflows/release.yml`). Final acceptance happens on the Raspberry Pi hardware.
