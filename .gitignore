@@ -10,7 +10,6 @@ __pycache__/
 
 poetry.lock
 
-quadstick_display/**
 quadstick_display.zip
 .venv/**
 venv/**
