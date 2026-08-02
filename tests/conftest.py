@@ -4,7 +4,6 @@ These tests run on hosts without Raspberry Pi hardware. They must never
 instantiate ``qs_display.EPaperDisplay`` or import ``waveshare_epd``; the
 fake display below records the black/red frames in memory instead.
 """
-import asyncio
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -40,16 +39,6 @@ class FakeEPaperDisplay:
 @pytest.fixture
 def fake_display():
     return FakeEPaperDisplay()
-
-
-@pytest.fixture(autouse=True, scope='session')
-def _event_loop():
-    # HttpMenu.__init__ calls asyncio.get_event_loop(); provide a loop so the
-    # tests do not rely on implicit loop creation (deprecated on 3.12).
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
 
 
 @pytest.fixture

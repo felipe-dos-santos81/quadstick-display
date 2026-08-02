@@ -1,14 +1,18 @@
-import asyncio
 import logging
 import os
 import re
 import time
+from pathlib import Path
 
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 from flask import Flask, render_template, request, redirect, url_for
 from math import ceil
 from werkzeug.utils import secure_filename
+
+from quadstick_display.controller import DisplayController, DisplaySize
+from quadstick_display.model import ProfileStore
+from quadstick_display.view import ProfileRenderer
 
 logging.basicConfig(level=logging.INFO)
 
@@ -228,6 +232,28 @@ class EPaperDisplay:
         time.sleep(2)
 
 
+class EPaperDisplayAdapter:
+    """Adapt the legacy ``EPaperDisplay`` to the ``DisplayDevice`` seam.
+
+    Temporary M3 bridge so ``HttpMenu`` can drive the display through
+    ``DisplayController``; ``hardware.WaveshareDisplay`` replaces this
+    adapter in M4 when the Flask shell is cut over.
+    """
+
+    def __init__(self, epd):
+        self._epd = epd
+
+    @property
+    def size(self):
+        return DisplaySize(width=self._epd.width, height=self._epd.height)
+
+    def initialize(self):
+        self._epd.initialize_display()
+
+    def show(self, frame):
+        self._epd.display_content(frame.black, frame.red)
+
+
 class ImageCreator:
     def __init__(self):
         self.puff_icon = self.load_icon(
@@ -347,13 +373,20 @@ class HttpMenu:
 
         os.makedirs(self.upload_folder, exist_ok=True)
 
+        # M3: /render delegates synchronously to the display controller,
+        # which serializes the load-render-show transaction against the
+        # same legacy display object used for the startup screen.
+        self.controller = DisplayController(
+            store=ProfileStore(self.upload_folder),
+            renderer=ProfileRenderer(Path(BASE_DIR) / 'resources'),
+            device=EPaperDisplayAdapter(epd),
+        )
+
         # Define routes
         self.app.add_url_rule('/', 'index', self.index)
         self.app.add_url_rule('/render', 'render', self.render, methods=['POST'])
         self.app.add_url_rule('/upload', 'upload', self.upload, methods=['POST'])
         self.app.add_url_rule('/uploads/<filename>', 'uploaded_file', self.uploaded_file)
-
-        self.loop = asyncio.get_event_loop()
 
         # Display the initial screen
         InitScreen(epd).display_initial_screen()
@@ -386,27 +419,18 @@ class HttpMenu:
     def uploaded_file(self, filename):  # noqa
         return f'File uploaded successfully: {filename}'
 
-    async def render(self):
+    def render(self):
         self.selected_file = request.form.get('selected_file')
         if not self.selected_file:
             return redirect(url_for('index'))
 
-        await asyncio.get_running_loop().create_task(self.render_csv())
-        return redirect(url_for('index'))
-
-    async def render_csv(self):
         try:
-            csv_loader = CSVLoader(self.selected_file)
-            data, name = await asyncio.to_thread(csv_loader.load_csv)
-            font_text = ImageFont.truetype(FONT_PATHS['verdana_bold'], TEXT_SIZE)
-            image_creator = ImageCreator()
-            image_blk, image_red = await asyncio.to_thread(image_creator.create_image, data, font_text, self.epd.width,
-                                                           self.epd.height)
-            await asyncio.to_thread(self.epd.display_content, image_blk, image_red)
+            self.controller.show_profile(self.selected_file)
         except IOError as e:
             logging.error(f"IOError: {e}")
         except Exception as e:
             logging.error(f"An error occurred: {e}")
+        return redirect(url_for('index'))
 
     def run(self, host='0.0.0.0', port=HTTP_PORT, debug=False):
         self.app.run(debug=debug, host=host, port=port, use_reloader=False)

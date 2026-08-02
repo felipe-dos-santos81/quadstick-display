@@ -176,6 +176,38 @@ class TestRender:
         assert response.status_code == 302
         assert response.headers['Location'] == '/'
         assert len(http_env.display.frames) == 1
-        # A missing file surfaces through the IOError handler today.
+        # M3: a missing profile surfaces as the model's typed ProfileNotFound
+        # (an IOError subclass), so the log keeps the legacy 'IOError' prefix
+        # but names the file without the legacy errno path text.
         assert 'IOError' in caplog.text
-        assert 'No such file or directory' in caplog.text
+        assert 'does_not_exist.csv' in caplog.text
+        # The failed write does not become the current profile.
+        status = http_env.menu.controller.status
+        assert status.current_profile is None
+        assert 'does_not_exist.csv' in status.last_error
+
+    def test_render_display_failure_preserves_previous_profile(self, http_env, monkeypatch):
+        # First render succeeds and becomes the current profile.
+        response = http_env.client.post(
+            '/render', data={'selected_file': 'ad_infinitum.csv'}
+        )
+        assert response.status_code == 302
+        assert http_env.menu.controller.status.current_profile == 'ad_infinitum.csv'
+
+        # A hardware failure on the next render redirects like a success,
+        # draws nothing new, and keeps the previous profile.
+        def broken_display_content(image_black, image_red):
+            raise OSError('panel offline')
+
+        monkeypatch.setattr(
+            http_env.display, 'display_content', broken_display_content
+        )
+        response = http_env.client.post(
+            '/render', data={'selected_file': 'alan_wake_II.csv'}
+        )
+        assert response.status_code == 302
+        assert response.headers['Location'] == '/'
+        assert len(http_env.display.frames) == 2  # startup + first render only
+        status = http_env.menu.controller.status
+        assert status.current_profile == 'ad_infinitum.csv'
+        assert 'panel offline' in status.last_error
