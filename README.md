@@ -1,41 +1,32 @@
 # Quadstick e-ink display
 
-Display the current Quadstick keys configuration on an e-ink display. 
+Shows the current [Quadstick](https://www.quadstick.com) key configuration on a
+Waveshare e-ink display — a quick reference for the active key bindings while
+playing games. A small web interface on port 8080 is used to upload and select
+profiles.
 
-Useful as a quick reference for the current key bindings when playing games.
+## Usage
 
-**Legal Disclaimer**
+|                 Startup screen (shows the URL)                 |                  Web interface: upload and select                  |              Rendered key set              |
+|:--------------------------------------------------------------:|:------------------------------------------------------------------:|:------------------------------------------:|
+|        ![Init screen](readme_images/qs_init.jpg)               | ![Web interface](readme_images/display_web_interface.jpg)          | ![Key settings](readme_images/qs_keys.jpeg)|
 
-* [Quadstick](https://www.quadstick.com) is a trademark of Quadstick. 
-* [Raspberry Pi](https://www.raspberrypi.com) is a trademark of the Raspberry Pi Foundation. 
-* [Waveshare](https://www.waveshare.com) is a trademark of Waveshare Electronics. 
+1. Use the CSV file stored on the Quadstick.
+2. Open `http://<pi-ip>:8080`, upload the CSV, and select it.
+3. The selected key set is rendered on the display.
 
-> _All other trademarks mentioned herein are the property of their respective owners._
+### Sip / puff legend
 
-## Handling Quadstick CSV files
+The arrow shows the air flow direction.
 
-|           Initialization Screen           | Upload and keys selection must be done through the web interface      | Display a given key-set can be done through the web |
-|:-----------------------------------------:|-----------------------------------------------------------------------|:---------------------------------------------------:|
-| ![Init screen](readme_images/qs_init.jpg) | ![display_web_interface.jpg](readme_images/display_web_interface.jpg) | ![Key settings screen](readme_images/qs_keys.jpeg)  |
-
-> **Note**: The CSV file stored on the Quadstick is the ones that must be used to upload.
-
-## The arrow represents the air flow direction
-
-|  **Sip** is represented by left arrow   |  **Puff** is represented by right arrow   | **Sip soft** and **Puff soft** are represented by the `soft` text |
-|:---------------------------------------:|:-----------------------------------------:|:-----------------------------------------------------------------:|
-| ![mp_sip.jpg](readme_images/mp_sip.jpg) | ![mp_puff.jpg](readme_images/mp_puff.jpg) |        ![mq_puff_soft.jpg](readme_images/mq_puff_soft.jpg)        |
-
-## 3D Printed case View
-
-|                    **Rear view**                    |                       **Connectors view**                       |
-|:---------------------------------------------------:|:---------------------------------------------------------------:|
-| ![3d_box_rear.jpeg](readme_images/3d_box_rear.jpeg) | ![3d_box_connectors.jpeg](readme_images/3d_box_connectors.jpeg) |
+|      **Sip** = left arrow       |      **Puff** = right arrow       | Soft variants show the `soft` text        |
+|:-------------------------------:|:---------------------------------:|:-----------------------------------------:|
+| ![sip](readme_images/mp_sip.jpg) | ![puff](readme_images/mp_puff.jpg) | ![soft](readme_images/mq_puff_soft.jpg) |
 
 ## Hardware
 
 * [Waveshare 4.2 inch e-ink display](https://www.waveshare.com/wiki/4.2inch_e-Paper_Module_Manual#Working_With_Raspberry_Pi)
-* [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/)
+* [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) (or Zero W)
 
 ### Wiring
 
@@ -50,150 +41,65 @@ Useful as a quick reference for the current key bindings when playing games.
 | RST (Reset)        | Pin 11       |
 | BUSY               | Pin 18       |
 
-#### Raspberry Pi Pinout
-
 |                **Raspberry Pi Zero 2 W Pinout**                 |           **Waveshare 4.2 inch e-ink display**            |
 |:---------------------------------------------------------------:|:---------------------------------------------------------:|
 | ![raspberry_pi_pinout.jpeg](readme_images/rasp_02w_pinout.jpeg) | ![display_pinout.jpeg](readme_images/display_pinout.jpeg) |
 
+## 3D printed case
 
-## Software
+Printable parts are in [`3d_case/`](3d_case/).
 
-Download the [Raspberry Pi Imager](https://www.raspberrypi.com/software/). 
+|                    **Rear view**                    |                       **Connectors view**                       |
+|:---------------------------------------------------:|:---------------------------------------------------------------:|
+| ![3d_box_rear.jpeg](readme_images/3d_box_rear.jpeg) | ![3d_box_connectors.jpeg](readme_images/3d_box_connectors.jpeg) |
 
-Use it to flash the **Raspberry Pi OS Lite** image to a microSD card.
+## Installation
 
-`For Raspberry Pi Zero 2 W: 64 Bit > Raspberry Pi OS (other) > Raspberry Pi OS Lite (64-bit)` <br>
-`For Raspberry Pi Zero W:   32 Bit > Raspberry Pi OS (other) > Raspberry Pi OS Lite (32-bit)`
+1. Flash **Raspberry Pi OS Lite** with the [Raspberry Pi Imager](https://www.raspberrypi.com/software/):
+   * Zero 2 W: 64-bit image; Zero W: 32-bit image
+   * Under customization: set the hostname to `qs-display`, configure Wi-Fi, and enable SSH
+   * Note: the Pi Zero supports 2.4 GHz Wi-Fi only
+2. Download `quadstick-display.sh` from the [releases](../../releases) page and copy it to the Pi:
 
-<details>
+   ```bash
+   scp quadstick-display.sh <username>@<pi-ip>:
+   ```
 
-<summary>Expand for detailed instructions with screenshots</summary>
+3. Run it on the Pi:
 
-### Raspberry Pi Imager Steps
+   ```bash
+   chmod +x quadstick-display.sh && ./quadstick-display.sh
+   ```
 
-|             **Select Device #1**              |             **Select Device #2**              |
-|:---------------------------------------------:|:---------------------------------------------:|
-| ![rasp_img0.jpg](readme_images/rasp_img0.jpg) | ![rasp_img1.jpg](readme_images/rasp_img1.jpg) |
-
-|               **Choose OS #1**                |               **Choose OS #2**                |
-|:---------------------------------------------:|:---------------------------------------------:|
-| ![rasp_img2.jpg](readme_images/rasp_img2.jpg) | ![rasp_img3.jpg](readme_images/rasp_img3.jpg) |
-
-> On Raspberry Pi OS (other) category with NO Desktop Environment
-
-<br>
-
-|              **Choose Storage**               |             **Edit Settings #1**              |
-|:---------------------------------------------:|:---------------------------------------------:|
-| ![rasp_img4.jpg](readme_images/rasp_img4.jpg) | ![rasp_img5.jpg](readme_images/rasp_img5.jpg) |
-
-> Change the custom settings by clicking on the `Edit Settings` button
-
-<br>
-
-#### Raspberry Pi Custom Settings Steps
-
-##### On the `General` tab
-
-1. Set the hostname to 'qs-display'
-2. Set the username and password as you prefer
-3. Set the Wi-Fi SSID, password and country code <br>
-![rasp_img6.jpg](readme_images/rasp_img6.jpg) <br>
-
-> Raspberry Pi Zero's support 2G Wi-Fi only
-
-##### On the `Services` tab
-
-1. Enable SSH <br>
-![rasp_img7.jpg](readme_images/rasp_img7.jpg) <br>
-2. Press `Save` and then `Write` to flash the image to the microSD card
-
-> **Note**: SSH can be used with `password` or `public-key` based authentication. 
-
-</details>
-
-### Installing
-
-Releases are published from `v*` tags. Download the `quadstick-display.sh` installer package from the [releases](../../releases) page.
-
-Copy the installer package file to the Raspberry Pi
-
-<details>
-
-<summary>How to copy the file to Raspberry Pi On Windows</summary>
-
-1. Download and install [WinSCP](https://winscp.net/eng/download.php)
-2. Open WinSCP and enter the Raspberry Pi IP address, `username` and `password`
-3. Navigate to the folder where the `installer` file is located
-4. Drag and drop the file to the Raspberry Pi
-
-</details>
-
-<details>
-
-<summary>How to copy the file to Raspberry Pi On Linux and MacOS</summary>
-
-1. Open a terminal
-2. Use `scp` to copy the file to the Raspberry Pi
-
-```bash
-scp quadstick-display.sh <username>@<raspberry_pi_ip>:/home/<username>
-```
-
-</details>
-
-Access the Raspberry Pi using SSH
-
-<details>
-
-<summary>How to access the Raspberry Pi On Windows</summary>
-
-1. Download and install [PuTTY](https://www.putty.org/)
-2. Open PuTTY and enter the Raspberry Pi IP address
-3. Click `Open` and enter the `username` and `password`
-4. You should now be connected to the Raspberry Pi
-
-</details>
-
-<details>
-
-<summary>How to access the Raspberry Pi On Linux and MacOS</summary>
-
-1. Open a terminal
-2. Use `ssh` to connect to the Raspberry Pi
-3. Enter the `username` and `password`
-4. You should now be connected to the Raspberry Pi
-
-</details>
-
-Install the `installer` package on the Raspberry Pi
-
-```bash
-chmod +x quadstick-display.sh && ./quadstick-display.sh
-```
-
-The installer extracts the application to `/usr/local/quadstick-display`, creates a Python virtual environment, and enables the `qs_display_httpd.service` systemd unit, which serves the web interface on port 8080. Re-running the installer upgrades the application in place; custom uploaded CSV profiles are preserved.
+The installer extracts the application to `/usr/local/quadstick-display`,
+creates a virtual environment, and enables the `qs_display_httpd.service`
+systemd unit serving the web interface on port 8080. Re-running the installer
+upgrades the application in place; custom uploaded CSV profiles are preserved.
 
 ## Development
 
-Requires Python 3.10+ and [Poetry](https://python-poetry.org/).
-
-The application lives in the `quadstick_display` package following a Model-View-Controller split (`model.py`, `view.py`, `controller.py`, `hardware.py`, `web.py`); `qs_display.py` remains the production entrypoint invoked by the systemd unit, and resources (templates, fonts, images, CSV profiles) ship in `resources/` next to the package.
+Requires Python 3.10+ and [Poetry](https://python-poetry.org/). The application
+is the `quadstick_display` package (MVC split: `model.py`, `view.py`,
+`controller.py`, `hardware.py`, `web.py`); `qs_display.py` is the compatibility
+entrypoint invoked by the systemd unit, and resources (templates, fonts,
+images, CSV profiles) ship in `resources/`.
 
 ```bash
-# install dependencies (the export plugin is needed to build the installer)
-poetry self add poetry-plugin-export  # pipx installs: pipx inject poetry poetry-plugin-export
-poetry install --with dev --no-interaction
-
-# run the test suite (no Raspberry Pi hardware required)
-poetry run pytest -q
-
-# build the installer package into dist/
-scripts/build_installer.sh
-
-# verify the packaged archive
-unzip -t dist/quadstick-display.zip
+make install    # install dependencies via Poetry
+make test       # full test suite (no Raspberry Pi hardware required)
+make build      # installer artifacts into dist/
+make verify     # CI-equivalent: static checks + tests + packaging
 ```
 
-Continuous integration runs the tests and the packaging on every pull request and branch push with read-only permissions (`.github/workflows/verify.yml`). Pushing a `v*` tag runs the same checks and publishes the GitHub release with the installer attached (`.github/workflows/release.yml`). Final acceptance happens on the Raspberry Pi hardware.
+Run `make help` for all targets. Building the installer requires
+`poetry-plugin-export` (`make install-export-plugin` installs it).
+
+Pull requests and branch pushes run tests and packaging with read-only
+permissions (`.github/workflows/verify.yml`). Pushing a `v*` tag runs the same
+checks and publishes the release (`.github/workflows/release.yml`). Final
+acceptance happens on the Raspberry Pi hardware.
+
+## Legal
+
+Quadstick, Raspberry Pi, and Waveshare are trademarks of their respective
+owners.
