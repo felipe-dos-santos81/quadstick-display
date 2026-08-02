@@ -16,7 +16,7 @@ pillow = "^10.4.0"
 spidev = {version = "^3.6", platform = "linux"}
 gpiozero = {version = "^2.0.1", platform = "linux"}
 rpi-gpio = {version = "^0.7.1", platform = "linux"}
-lgpio = {version = "^0.2.2.0", platform = "linux"}
+lgpio = {version = "^0.2.2.0", markers = "sys_platform == 'linux' and (platform_machine == 'aarch64' or platform_machine == 'armv7l')"}
 
 # Waveshare e-Paper display dependencies
 jetson-gpio = {version = "^2.1.6", platform = "linux"}

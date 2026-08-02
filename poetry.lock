@@ -183,7 +183,7 @@ description = "Linux SBC GPIO module"
 optional = false
 python-versions = "*"
 groups = ["main"]
-markers = "sys_platform == \"linux\""
+markers = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"armv7l\")"
 files = [
     {file = "lgpio-0.2.2.0-cp310-cp310-linux_armv7l.whl", hash = "sha256:97fe5fb0e888c96031e8899e8c0eca64c63076a6d1f1e774acad8696430b2ff6"},
     {file = "lgpio-0.2.2.0-cp310-cp310-manylinux_2_34_aarch64.whl", hash = "sha256:f8f1a2818ed4293182999679ac8559aea70d45743f5a3ae8025837e529d9e0d4"},
@@ -629,4 +629,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "ca85845f2957094125df1e9198cc91d9cb8c742f9c48034fea531db394614d13"
+content-hash = "494c53a451838537ac8abea77e7843bbfcf8d04a130383771764773d5cf3e716"
