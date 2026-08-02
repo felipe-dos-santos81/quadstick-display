@@ -21,15 +21,18 @@ display attached to a Raspberry Pi, with a Flask web interface on port 8080.
 ## Make targets
 
 A Makefile at the repo root wraps the local workflow; run `make help` to list
-the targets (`make install`, `make check`, `make test`, `make build`,
-`make verify`, `make clean`). `make verify` runs the full CI-equivalent block
-(static checks, the test suite, packaging, and `git diff --check`).
+the targets (`make install`, `make check`, `make format`, `make test`,
+`make build`, `make verify`, `make clean`). `make verify` runs the full
+CI-equivalent block (static checks including ruff, the test suite, packaging,
+and `git diff --check`).
 
 ## Verified local commands
 
 ```bash
 poetry check
 poetry install --with dev --no-interaction
+poetry run ruff check .
+poetry run ruff format --check .
 poetry run pytest -q
 python -m compileall -q quadstick_display qs_display.py
 bash -n scripts/build_installer.sh resources/install/*.sh
@@ -43,10 +46,19 @@ unzip -t dist/quadstick-display.zip
 
 ## CI
 
-- `.github/workflows/verify.yml` — pull requests and non-tag pushes run tests
-  and packaging with `contents: read`; it cannot publish.
-- `.github/workflows/release.yml` — `v*` tag pushes run the same checks and
-  create the GitHub release with `quadstick-display.sh` attached.
+- `.github/workflows/_verify.yml` — reusable workflow (`workflow_call`)
+  holding the whole verify block: `static-checks` (poetry check, ruff lint +
+  format, compileall, shell syntax, PR whitespace check), `tests` (Python
+  3.10/3.11/3.12 matrix, fail-fast off), and `package` (installer build +
+  `shell-installer` artifact). Jobs cache Poetry dependencies via
+  `actions/setup-python` (`cache: 'poetry'`).
+- `.github/workflows/verify.yml` — pull requests and non-tag pushes call the
+  reusable verify workflow with `contents: read`; it cannot publish.
+- `.github/workflows/release.yml` — `v*` tag pushes call the reusable verify
+  workflow, then a `contents: write` job checks the tag matches the
+  pyproject version and creates the GitHub release with auto-generated
+  notes (`--prerelease` for hyphenated tags) and `quadstick-display.sh`
+  attached.
 
 ## Hardware constraints
 
