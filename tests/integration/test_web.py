@@ -25,6 +25,7 @@ import io
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 from flask import Flask
@@ -206,6 +207,17 @@ class TestUpload:
             'File uploaded successfully: My_File.csv'
         )
 
+    def test_upload_confirmation_reflects_filename_as_plain_text(self, client):
+        # The confirmation route reflects the URL filename into the body;
+        # it must be served as text/plain so markup is never interpreted.
+        markup = '<img src=x onerror=alert(1)>'
+        response = client.get(f'/uploads/{quote(markup)}')
+        assert response.status_code == 200
+        assert response.content_type.startswith('text/plain')
+        assert response.get_data(as_text=True) == (
+            f'File uploaded successfully: {markup}'
+        )
+
     def test_upload_sanitizes_unsafe_filenames(self, client, tmp_path):
         response = post_upload(client, b'data', '../../evil.csv')
         assert response.status_code == 302
@@ -323,6 +335,15 @@ class TestRender:
     def test_render_invalid_csv_is_422(self, client, display, tmp_path):
         (tmp_path / 'broken.csv').write_text('this is not a quadstick export\n')
         response = client.post('/render', data={'selected_file': 'broken.csv'})
+        assert response.status_code == 422
+        assert 'not a valid Quadstick CSV' in response.get_data(as_text=True)
+        assert display.frames == []
+
+    def test_render_non_utf8_csv_is_422(self, client, display, tmp_path):
+        (tmp_path / 'latin1.csv').write_bytes(
+            b'QuadStick Configuration,Version 1.5,id,Caf\xe9\n'
+        )
+        response = client.post('/render', data={'selected_file': 'latin1.csv'})
         assert response.status_code == 422
         assert 'not a valid Quadstick CSV' in response.get_data(as_text=True)
         assert display.frames == []

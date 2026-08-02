@@ -7,8 +7,9 @@ display attached to a Raspberry Pi, with a Flask web interface on port 8080.
 
 - `quadstick_display/` — the application package (MVC split):
   - `model.py` — pure domain model and profile store (no Flask/Pillow/hardware)
-  - `view.py` — pure Pillow renderer and the `DisplayDevice` protocol
-  - `controller.py` — serialized display transactions
+  - `view.py` — pure Pillow renderer
+  - `controller.py` — serialized display transactions and the `DisplayDevice`
+    protocol
   - `hardware.py` — Waveshare adapter (imports the driver lazily)
   - `web.py` — Flask blueprint and the `create_app` factory
   - `__main__.py` — production composition root
@@ -16,6 +17,13 @@ display attached to a Raspberry Pi, with a Flask web interface on port 8080.
 - `resources/` — templates, fonts, images, default CSV profiles, installer scripts
 - `scripts/build_installer.sh` — assembles the installer into `dist/`
 - `tests/` — unit, integration, and characterization tests (no hardware required)
+
+## Make targets
+
+A Makefile at the repo root wraps the local workflow; run `make help` to list
+the targets (`make install`, `make check`, `make test`, `make build`,
+`make verify`, `make clean`). `make verify` runs the full CI-equivalent block
+(static checks, the test suite, packaging, and `git diff --check`).
 
 ## Verified local commands
 

@@ -278,6 +278,14 @@ class TestProfileStoreSaveUpload:
             ('kb_b', 'down'),
         ]
 
+    def test_save_upload_overwrites_an_existing_same_name_file(
+        self, store, tmp_path
+    ):
+        first = store.save_upload('game.csv', io.BytesIO(b'first'))
+        second = store.save_upload('game.csv', io.BytesIO(b'second'))
+        assert first == second == 'game.csv'
+        assert (tmp_path / 'game.csv').read_bytes() == b'second'
+
     def test_path_separators_are_sanitized_not_traversed(self, store, tmp_path):
         saved = store.save_upload('sub/dir.csv', io.BytesIO(b'data'))
         assert saved == 'sub_dir.csv'

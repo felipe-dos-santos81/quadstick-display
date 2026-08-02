@@ -126,10 +126,13 @@ class DisplayController:
     def show_profile(self, name: str) -> DisplayStatus:
         """Load, render, and show ``name``; return the new status.
 
-        Raises the typed model errors unchanged and ``DisplayFailure``
-        (chained from the cause) for any renderer or hardware error;
-        either way ``current_profile`` is preserved and ``last_error``
-        records the failure message.
+        Typed model errors (``InvalidProfileName``, ``ProfileNotFound``,
+        ``InvalidProfile``) propagate unchanged, and renderer or hardware
+        errors are raised as ``DisplayFailure`` (chained from the cause);
+        both record ``last_error`` and preserve ``current_profile``.
+        Unexpected store-load errors (e.g. an ``OSError`` from the store
+        that is not a typed model error) propagate unchanged *without*
+        recording ``last_error``.
         """
         with self._lock:
             try:

@@ -27,6 +27,7 @@ from typing import Mapping
 from flask import (
     Blueprint,
     Flask,
+    Response,
     current_app,
     redirect,
     render_template,
@@ -159,7 +160,11 @@ def upload():
 
 @bp.route('/uploads/<filename>')
 def uploaded_file(filename):
-    return f'File uploaded successfully: {filename}'
+    # Plain text: the filename is reflected into the response, so it must
+    # never be served as text/html.
+    return Response(
+        f'File uploaded successfully: {filename}', mimetype='text/plain'
+    )
 
 
 @bp.route('/render', methods=['POST'])
