@@ -8,8 +8,6 @@ __pycache__/
 
 .idea/**
 
-poetry.lock
-
 quadstick_display.zip
 .venv/**
 venv/**

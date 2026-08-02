@@ -4,12 +4,11 @@ version = "0.1.0"
 description = "Display Quadstick data on an Waveshare e-ink display"
 authors = ["Felipe dos Santos <fss007@gmail.com>"]
 readme = "README.md"
+packages = [{include = "quadstick_display"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pandas = "^2.2.2"
-flask = {extras = ["async"], version = "^3.0.3"}
-flask-uploads = "^0.2.1"
+flask = "^3.0.3"
 werkzeug = "^3.0.3"
 pillow = "^10.4.0"
 

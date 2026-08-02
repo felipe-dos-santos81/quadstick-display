@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 if ! grep -q Raspberry /proc/cpuinfo; then
   echo "This script is intended to run on a Raspberry Pi only!"
@@ -9,6 +10,13 @@ if [[ "$(uname)" != "Linux" ]]; then
   echo "This script is intended to run on a Raspberry Pi with Linux only!"
   exit 1
 fi
+
+for cmd in awk tail unzip sudo systemctl; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Error: required command '$cmd' is not installed." >&2
+    exit 1
+  fi
+done
 
 SELF="$0"
 SWAP_FILE=/swapfile
@@ -37,8 +45,16 @@ USER=$(whoami)
 echo
 echo "Installing $APP_NAME for user $USER"
 
+# Remove obsolete packaged Python files from previous installations.
+# Custom uploaded CSVs under resources/quadstick_csvs are preserved.
+if [[ -d "$BASE_DIR/$APP_NAME" ]]; then
+  sudo rm -rf "$BASE_DIR/$APP_NAME/quadstick_display" \
+    "$BASE_DIR/$APP_NAME/__pycache__"
+  sudo find "$BASE_DIR/$APP_NAME" -maxdepth 1 -name '*.py[co]' -delete
+fi
+
 tail -n +"$ARCHIVE_LINE" "$SELF" >/tmp/archive.zip &&
-  sudo unzip /tmp/archive.zip -d "$BASE_DIR" &&
+  sudo unzip -o /tmp/archive.zip -d "$BASE_DIR" &&
   rm /tmp/archive.zip
 
 sudo chown -R "${USER}:${USER}" "$BASE_DIR/$APP_NAME"
@@ -109,7 +125,8 @@ sudo apt-get install -yq \
 __step "" "the application"
 
 if [[ ! -d "$BASE_DIR/$APP_NAME" ]]; then
-  echo "Error: $BASE_DIR/$APP_NAME not found!"
+  echo "Error: $BASE_DIR/$APP_NAME not found!" >&2
+  exit 1
 fi
 
 __step "" "Creating virtual environment"
@@ -125,7 +142,8 @@ cd "$BASE_DIR/$APP_NAME" || exit 1
 pip install -r "requirements.txt"
 
 __step "" "Enabling the application via http"
-HAS_HTTPD=$(sudo grep -c qs_display_httpd /etc/systemd/system/qs_display_httpd.service)
+HAS_HTTPD=$(sudo grep -c qs_display_httpd /etc/systemd/system/qs_display_httpd.service 2>/dev/null || true)
+HAS_HTTPD=${HAS_HTTPD:-0}
 sudo chmod +x "$BASE_DIR/$APP_NAME/qs_display_httpd.sh"
 
 sudo sed -ie "s/__USER__/$USER/" "$BASE_DIR/$APP_NAME/qs_display_httpd.service" 2>/dev/null
