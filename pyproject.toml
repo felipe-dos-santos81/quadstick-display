@@ -24,6 +24,9 @@ jetson-gpio = {version = "^2.1.6", platform = "linux"}
 waveshare-epd = { git = "https://github.com/waveshareteam/e-Paper.git", branch = "master", subdirectory = "RaspberryPi_JetsonNano/python" }
 
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.1.1"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
