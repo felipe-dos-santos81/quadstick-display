@@ -1,0 +1,119 @@
+# Custom app to Display Quadstick key settings on an e-ink display
+# 2024 felipe.dos.santos
+
+name: "Verify Quadstick Display (reusable)"
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: "quadstick-display"
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install the Poetry export plugin
+        run: pipx inject poetry poetry-plugin-export
+
+      - name: Set up Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: poetry install --with dev --no-interaction
+
+      - name: Check Poetry project configuration
+        run: poetry check
+
+      - name: Lint with ruff
+        run: poetry run ruff check .
+
+      - name: Check formatting with ruff
+        run: poetry run ruff format --check .
+
+      - name: Bytecode-compile the application
+        run: poetry run python -m compileall -q quadstick_display qs_display.py
+
+      - name: Syntax-check shell scripts
+        run: bash -n scripts/build_installer.sh resources/install/*.sh
+
+      - name: Check for whitespace errors
+        if: github.event_name == 'pull_request'
+        run: git diff --check ${{ github.event.pull_request.base.sha }}...HEAD
+
+  tests:
+    needs: static-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install the Poetry export plugin
+        run: pipx inject poetry poetry-plugin-export
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: poetry install --with dev --no-interaction
+
+      - name: Run tests
+        run: poetry run pytest -q
+
+  package:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install the Poetry export plugin
+        run: pipx inject poetry poetry-plugin-export
+
+      - name: Set up Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'poetry'
+
+      - name: Build the installer package
+        run: scripts/build_installer.sh
+
+      - name: Verify the installer archive integrity
+        run: unzip -t dist/${{ env.APP_NAME }}.zip
+
+      - name: Upload the installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-installer
+          retention-days: 7
+          path: |
+            ./dist/${{ env.APP_NAME }}.sh
+            ./dist/3d_case.zip
