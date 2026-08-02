@@ -5,6 +5,7 @@ local access URL and shows it, then builds and runs the Flask
 application. Importing this module is side-effect free; every side
 effect lives in ``main()``.
 """
+
 import logging
 import socket
 import sys
@@ -15,17 +16,19 @@ from quadstick_display.view import ProfileRenderer
 from quadstick_display.web import RESOURCE_DIR
 
 HTTP_PORT = 8080
-HTTP_HOST = '0.0.0.0'
+HTTP_HOST = "0.0.0.0"
+
+logger = logging.getLogger(__name__)
 
 
 def _get_local_ip_address():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(('8.8.8.8', 80))
+            s.connect(("8.8.8.8", 80))
             return s.getsockname()[0]
-    except Exception as exc:
-        logging.error(f'An error occurred: {exc}')
-        return 'error-ip-address'
+    except OSError as exc:
+        logger.error(f"An error occurred: {exc}")
+        return "error-ip-address"
 
 
 def main(argv=None):
@@ -36,9 +39,9 @@ def main(argv=None):
     behavior. Any other argument is ignored with a warning.
     """
     args = list(sys.argv[1:] if argv is None else argv)
-    unknown = [arg for arg in args if arg != 'httpd']
+    unknown = [arg for arg in args if arg != "httpd"]
     if unknown:
-        logging.warning(f'Ignoring unrecognized arguments: {unknown}')
+        logger.warning(f"Ignoring unrecognized arguments: {unknown}")
 
     logging.basicConfig(level=logging.INFO)
 
@@ -46,7 +49,7 @@ def main(argv=None):
     display.initialize()
 
     # The startup screen renders before the server starts.
-    url = f'http://{_get_local_ip_address()}:{HTTP_PORT}'  # noqa: E501
+    url = f"http://{_get_local_ip_address()}:{HTTP_PORT}"
     renderer = ProfileRenderer(RESOURCE_DIR)
     display.show(renderer.render_startup(url, display.size))
 
@@ -54,5 +57,5 @@ def main(argv=None):
     app.run(host=HTTP_HOST, port=HTTP_PORT, use_reloader=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

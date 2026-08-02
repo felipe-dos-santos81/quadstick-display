@@ -12,6 +12,7 @@ one lock spans the whole transaction so concurrent requests can never
 interleave panel writes, and ``DisplayStatus.current_profile`` changes only
 after the panel accepts a frame.
 """
+
 import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
@@ -109,7 +110,7 @@ class DisplayController:
     def __init__(
         self,
         store: ProfileStore,
-        renderer: 'ProfileRenderer',
+        renderer: "ProfileRenderer",
         device: DisplayDevice,
     ):
         self._store = store
@@ -144,9 +145,7 @@ class DisplayController:
                 frame = self._renderer.render(profile, self._device.size)
                 self._device.show(frame)
             except Exception as exc:
-                failure = DisplayFailure(
-                    f'unable to display profile {name!r}: {exc}'
-                )
+                failure = DisplayFailure(f"unable to display profile {name!r}: {exc}")
                 self._record_error(str(failure))
                 raise failure from exc
             self._status = DisplayStatus(current_profile=name, last_error=None)

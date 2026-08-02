@@ -7,6 +7,7 @@ production. Tests must never instantiate ``hardware.WaveshareDisplay`` or
 import ``waveshare_epd``; the ``FakeDisplay`` in ``tests/fakes.py``
 records frames in memory instead.
 """
+
 import sys
 from pathlib import Path
 

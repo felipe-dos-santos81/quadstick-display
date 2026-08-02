@@ -19,10 +19,11 @@ upload 413, hardware failure 503. Error responses render the index view
 with an actionable message; successful uploads redirect to
 ``/uploads/<filename>`` and successful renders redirect to ``/``.
 """
+
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Mapping
 
 from flask import (
     Blueprint,
@@ -49,19 +50,21 @@ from quadstick_display.model import (
 )
 from quadstick_display.view import ProfileRenderer
 
-_RESOURCES = Path(__file__).resolve().parent.parent / 'resources'
+_RESOURCES = Path(__file__).resolve().parent.parent / "resources"
+
+logger = logging.getLogger(__name__)
 
 RESOURCE_DIR = _RESOURCES
-PROFILE_DIR = _RESOURCES / 'quadstick_csvs'
+PROFILE_DIR = _RESOURCES / "quadstick_csvs"
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # 2 MiB
 
 DEFAULT_CONFIG: Mapping[str, object] = {
-    'RESOURCE_DIR': RESOURCE_DIR,
-    'PROFILE_DIR': PROFILE_DIR,
-    'MAX_CONTENT_LENGTH': MAX_CONTENT_LENGTH,
+    "RESOURCE_DIR": RESOURCE_DIR,
+    "PROFILE_DIR": PROFILE_DIR,
+    "MAX_CONTENT_LENGTH": MAX_CONTENT_LENGTH,
 }
 
-bp = Blueprint('web', __name__)
+bp = Blueprint("web", __name__)
 
 
 def create_app(
@@ -81,14 +84,14 @@ def create_app(
     if config is not None:
         app.config.from_mapping(config)
 
-    resource_dir = Path(app.config['RESOURCE_DIR'])
-    profile_dir = Path(app.config['PROFILE_DIR'])
-    app.template_folder = str(resource_dir / 'templates')
+    resource_dir = Path(app.config["RESOURCE_DIR"])
+    profile_dir = Path(app.config["PROFILE_DIR"])
+    app.template_folder = str(resource_dir / "templates")
 
     store = ProfileStore(profile_dir)
     renderer = ProfileRenderer(resource_dir)
     controller = DisplayController(store=store, renderer=renderer, device=display)
-    app.extensions['quadstick_display'] = SimpleNamespace(
+    app.extensions["quadstick_display"] = SimpleNamespace(
         store=store,
         renderer=renderer,
         controller=controller,
@@ -100,7 +103,7 @@ def create_app(
 
 
 def _components() -> SimpleNamespace:
-    return current_app.extensions['quadstick_display']
+    return current_app.extensions["quadstick_display"]
 
 
 def _render_index(error: str | None = None, status_code: int = 200):
@@ -108,7 +111,7 @@ def _render_index(error: str | None = None, status_code: int = 200):
     components = _components()
     display_status = components.controller.status
     return render_template(
-        'index.html',
+        "index.html",
         csv_files=components.store.list_names(),
         selected_file=display_status.current_profile,
         status=display_status,
@@ -118,82 +121,72 @@ def _render_index(error: str | None = None, status_code: int = 200):
 
 def _format_size(limit: int) -> str:
     if limit >= 1024 * 1024:
-        return f'{limit / (1024 * 1024):g} MiB'
+        return f"{limit / (1024 * 1024):g} MiB"
     if limit >= 1024:
-        return f'{limit / 1024:g} KiB'
-    return f'{limit} bytes'
+        return f"{limit / 1024:g} KiB"
+    return f"{limit} bytes"
 
 
 @bp.app_errorhandler(RequestEntityTooLarge)
 def request_entity_too_large(error):
-    limit = current_app.config['MAX_CONTENT_LENGTH']
-    message = f'The uploaded file exceeds the {_format_size(limit)} size limit.'
-    logging.warning(f'Rejected oversized upload: {error}')
+    limit = current_app.config["MAX_CONTENT_LENGTH"]
+    message = f"The uploaded file exceeds the {_format_size(limit)} size limit."
+    logger.warning(f"Rejected oversized upload: {error}")
     return _render_index(message, 413)
 
 
-@bp.route('/')
+@bp.route("/")
 def index():
     return _render_index()
 
 
-@bp.route('/upload', methods=['POST'])
+@bp.route("/upload", methods=["POST"])
 def upload():
-    if 'file' not in request.files:
-        return _render_index(
-            'No file was uploaded. Choose a .csv file to upload.', 400
-        )
-    upload_file = request.files['file']
+    if "file" not in request.files:
+        return _render_index("No file was uploaded. Choose a .csv file to upload.", 400)
+    upload_file = request.files["file"]
     if not upload_file.filename:
-        return _render_index(
-            'No file was selected. Choose a .csv file to upload.', 400
-        )
+        return _render_index("No file was selected. Choose a .csv file to upload.", 400)
     try:
         filename = _components().store.save_upload(
             upload_file.filename, upload_file.stream
         )
     except InvalidProfileName as exc:
-        logging.warning(f'Rejected upload {upload_file.filename!r}: {exc}')
-        return _render_index(f'Upload rejected: {exc}', 400)
-    return redirect(url_for('web.uploaded_file', filename=filename))
+        logger.warning(f"Rejected upload {upload_file.filename!r}: {exc}")
+        return _render_index(f"Upload rejected: {exc}", 400)
+    return redirect(url_for("web.uploaded_file", filename=filename))
 
 
-@bp.route('/uploads/<filename>')
+@bp.route("/uploads/<filename>")
 def uploaded_file(filename):
     # Plain text: the filename is reflected into the response, so it must
     # never be served as text/html.
-    return Response(
-        f'File uploaded successfully: {filename}', mimetype='text/plain'
-    )
+    return Response(f"File uploaded successfully: {filename}", mimetype="text/plain")
 
 
-@bp.route('/render', methods=['POST'])
+@bp.route("/render", methods=["POST"])
 def render():
-    name = request.form.get('selected_file', '')
+    name = request.form.get("selected_file", "")
     if not name:
-        return _render_index(
-            'Select a profile to display before submitting.', 400
-        )
+        return _render_index("Select a profile to display before submitting.", 400)
     try:
         _components().controller.show_profile(name)
     except InvalidProfileName as exc:
-        logging.warning(f'Rejected render request: {exc}')
-        return _render_index(f'Invalid profile name: {exc}', 400)
+        logger.warning(f"Rejected render request: {exc}")
+        return _render_index(f"Invalid profile name: {exc}", 400)
     except ProfileNotFound as exc:
-        logging.warning(f'Render request for a missing profile: {exc}')
-        return _render_index(
-            f'Profile {name!r} was not found. Upload it first.', 404
-        )
+        logger.warning(f"Render request for a missing profile: {exc}")
+        return _render_index(f"Profile {name!r} was not found. Upload it first.", 404)
     except InvalidProfile as exc:
-        logging.warning(f'Render request for an invalid profile: {exc}')
+        logger.warning(f"Render request for an invalid profile: {exc}")
         return _render_index(
-            f'{name!r} is not a valid Quadstick CSV export: {exc}', 422
+            f"{name!r} is not a valid Quadstick CSV export: {exc}", 422
         )
     except DisplayFailure as exc:
-        logging.error(f'Display failure while rendering {name!r}: {exc}')
+        logger.error(f"Display failure while rendering {name!r}: {exc}")
         return _render_index(
-            'The display could not be updated; the previous profile is '
-            'still shown. Try again.',
+            "The display could not be updated; the previous profile is "
+            "still shown. Try again.",
             503,
         )
-    return redirect(url_for('web.index'))
+    return redirect(url_for("web.index"))

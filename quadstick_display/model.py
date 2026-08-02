@@ -22,6 +22,7 @@ the ``Output or Function`` header: command is column 0, quadstick input is
 column 2, and the section ends at the ``Preferences`` row. Rows with an
 empty command or input are skipped.
 """
+
 import csv
 import re
 import shutil
@@ -30,9 +31,9 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import BinaryIO, TextIO
 
-MAPPING_HEADER = 'Output or Function'
-PREFERENCES_MARKER = 'preferences'
-CSV_SUFFIX = '.csv'
+MAPPING_HEADER = "Output or Function"
+PREFERENCES_MARKER = "preferences"
+CSV_SUFFIX = ".csv"
 
 
 class InvalidProfile(ValueError):
@@ -74,13 +75,13 @@ def parse_quadstick_csv(stream: TextIO) -> Profile:
     first_row = next(rows, None)
     title = _last_non_empty(first_row) if first_row else None
     if title is None:
-        raise InvalidProfile('first row has no profile title')
+        raise InvalidProfile("first row has no profile title")
 
     for row in rows:
         if row and row[0].strip() == MAPPING_HEADER:
             break
     else:
-        raise InvalidProfile(f'missing {MAPPING_HEADER!r} mapping section')
+        raise InvalidProfile(f"missing {MAPPING_HEADER!r} mapping section")
 
     bindings = []
     for row in rows:
@@ -142,10 +143,10 @@ class ProfileStore:
         if not path.is_file():
             raise ProfileNotFound(name)
         try:
-            with path.open(newline='', encoding='utf-8') as stream:
+            with path.open(newline="", encoding="utf-8") as stream:
                 return parse_quadstick_csv(stream)
         except UnicodeDecodeError as exc:
-            raise InvalidProfile(f'{name!r} is not valid UTF-8 text') from exc
+            raise InvalidProfile(f"{name!r} is not valid UTF-8 text") from exc
 
     def save_upload(self, filename: str, stream: BinaryIO) -> str:
         """Store an uploaded CSV under its sanitized name; return that name.
@@ -155,7 +156,7 @@ class ProfileStore:
         """
         safe_name = _secure_filename(filename)
         _validate_name(safe_name)
-        with (self._directory / safe_name).open('wb') as target:
+        with (self._directory / safe_name).open("wb") as target:
             shutil.copyfileobj(stream, target)
         return safe_name
 
@@ -168,25 +169,28 @@ def _validate_name(name: str) -> None:
     """Enforce the strict single-file-name policy on stored profiles."""
     if (
         not name
-        or '..' in name
-        or '/' in name
-        or '\\' in name
+        or ".." in name
+        or "/" in name
+        or "\\" in name
         or PurePath(name).is_absolute()
         or not _has_csv_suffix(name)
     ):
         raise InvalidProfileName(
-            f'unsafe profile name: {name!r} (expected a single lowercase '
-            f'{CSV_SUFFIX!r} file name, no paths or traversal)'
+            f"unsafe profile name: {name!r} (expected a single lowercase "
+            f"{CSV_SUFFIX!r} file name, no paths or traversal)"
         )
 
 
 # --- werkzeug secure_filename semantics -------------------------------------
 # Replicated from werkzeug.utils.secure_filename so the model stays free of
 # web-framework imports; tests pin parity with werkzeug itself.
-_FILENAME_ASCII_STRIP_RE = re.compile(r'[^A-Za-z0-9_.-]')
+_FILENAME_ASCII_STRIP_RE = re.compile(r"[^A-Za-z0-9_.-]")
 _WINDOWS_DEVICE_FILES = {
-    'CON', 'AUX', 'NUL', 'PRN',
-    *(f'{base}{n}' for base in ('COM', 'LPT') for n in range(1, 10)),
+    "CON",
+    "AUX",
+    "NUL",
+    "PRN",
+    *(f"{base}{n}" for base in ("COM", "LPT") for n in range(1, 10)),
 }
 
 
@@ -194,21 +198,21 @@ def _secure_filename(filename: str) -> str:
     """Return a safe version of ``filename`` (werkzeug semantics)."""
     import os
 
-    filename = unicodedata.normalize('NFKD', filename)
-    filename = filename.encode('ascii', 'ignore').decode()
+    filename = unicodedata.normalize("NFKD", filename)
+    filename = filename.encode("ascii", "ignore").decode()
 
     for sep in (os.sep, os.altsep):
         if sep:
-            filename = filename.replace(sep, '_')
-    filename = str(
-        _FILENAME_ASCII_STRIP_RE.sub('', '_'.join(filename.split()))
-    ).strip('._')
+            filename = filename.replace(sep, "_")
+    filename = str(_FILENAME_ASCII_STRIP_RE.sub("", "_".join(filename.split()))).strip(
+        "._"
+    )
 
     if (
-        os.name == 'nt'
+        os.name == "nt"
         and filename
-        and filename.split('.')[0].upper() in _WINDOWS_DEVICE_FILES
+        and filename.split(".")[0].upper() in _WINDOWS_DEVICE_FILES
     ):
-        filename = f'_{filename}'
+        filename = f"_{filename}"
 
     return filename

@@ -5,6 +5,7 @@ frames they are shown instead of driving a panel. The default size mirrors
 the production wiring for the 4.2-inch panel: logical width 400 (the
 driver's ``height``) x logical height 300 (the driver's ``width``).
 """
+
 from quadstick_display.controller import DisplayFrame, DisplaySize
 
 PRODUCTION_SIZE = DisplaySize(width=400, height=300)
