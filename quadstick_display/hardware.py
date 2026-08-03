@@ -6,10 +6,13 @@ time, so the import happens lazily inside ``WaveshareDisplay.__init__``:
 importing this module (like the tests do on non-Pi hosts) must not load
 the driver.
 """
+
 import logging
 import time
 
 from quadstick_display.controller import DisplayFrame, DisplaySize
+
+logger = logging.getLogger(__name__)
 
 
 class WaveshareDisplay:
@@ -28,12 +31,12 @@ class WaveshareDisplay:
         return self._size
 
     def initialize(self) -> None:
-        logging.info("Initializing e-Paper display")
+        logger.info("Initializing e-Paper display")
         self._epd.init()
         self._epd.Clear()
 
     def show(self, frame: DisplayFrame) -> None:
-        logging.info("Displaying content on e-Paper display")
+        logger.info("Displaying content on e-Paper display")
         self._epd.display(
             imageblack=self._epd.getbuffer(frame.black),
             imagered=self._epd.getbuffer(frame.red),

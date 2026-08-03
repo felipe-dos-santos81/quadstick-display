@@ -11,7 +11,7 @@ EXPORT_PLUGIN = poetry-plugin-export
 DIST_DIR = dist
 APP_ZIP = $(DIST_DIR)/quadstick-display.zip
 
-.PHONY: help install install-export-plugin check \
+.PHONY: help install install-export-plugin check format \
         test test-unit test-integration test-characterization \
         build verify clean
 
@@ -41,10 +41,16 @@ install-export-plugin: ## Install poetry-plugin-export (required by make build)
 
 # ── Static checks ────────────────────────────────────────────────────────────
 
-check: install ## Run poetry check, bytecode compilation, and shell syntax checks
+check: install ## Run poetry check, ruff lint/format checks, bytecode compilation, and shell syntax checks
 	$(POETRY) check
+	$(POETRY) run ruff check .
+	$(POETRY) run ruff format --check .
 	$(PYTHON) -m compileall -q quadstick_display qs_display.py
 	bash -n scripts/build_installer.sh resources/install/*.sh
+
+format: install ## Auto-fix ruff lint violations and reformat the codebase
+	$(POETRY) run ruff check --fix .
+	$(POETRY) run ruff format .
 
 # ── Tests (no Raspberry Pi hardware required) ────────────────────────────────
 

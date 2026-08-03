@@ -12,42 +12,10 @@ on:
 permissions:
   contents: read
 
-env:
-  APP_NAME: "quadstick-display"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test-and-package:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Installing Poetry
-        run: pipx install poetry
-
-      - name: Installing the Poetry export plugin
-        run: pipx inject poetry poetry-plugin-export
-
-      - name: Install dependencies
-        run: poetry install --with dev --no-interaction
-
-      - name: Run tests
-        run: poetry run pytest -q
-
-      - name: Build the installer package
-        run: scripts/build_installer.sh
-
-      - name: Verify the installer archive integrity
-        run: unzip -t dist/${{ env.APP_NAME }}.zip
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: shell-installer
-          path: |
-            ./dist/${{ env.APP_NAME }}.sh
-            ./dist/3d_case.zip
+  verify:
+    uses: ./.github/workflows/_verify.yml
